@@ -21,29 +21,36 @@ const typeDefs = `
     address: CityAddress
   }
 
+  type CityError {
+    error: String
+  }
+
+  union CityOrError = City | CityError
+
   type Query {
-    city(cityName: String!): City
+    city(cityName: String!): CityOrError
   }
 `
-
-const fetchCity = async url => {
-  const result = await fetch(url)
-  const response = await result.json()
-  return response[0]
-}
 
 const resolvers = {
     Query: {
         city: async (_, args) => {
           const url = `https://nominatim.openstreetmap.org/search?addressdetails=1&q=${args.cityName}&format=jsonv2&limit=1`
-          const result = await fetchCity(url)
-          return {
-            name: result.name, 
-            country: result.address.country, 
-            address: result.address,
-            lat: result.lat,
-            lon: result.lon
-          }
+          return fetch(url)
+          .then(result=> result.json())
+          .then(res =>{
+            const result = res[0]
+            return  {
+              name: result.name, 
+              country: result.address.country, 
+              address: result.address,
+              lat: result.lat,
+              lon: result.lon
+            }
+          }).catch((e)=>{
+            console.log(e)
+            return {error: 'smth went wrong'}
+          })
         }
     },
     City: {
@@ -52,6 +59,12 @@ const resolvers = {
         const resp = await fetch(url).then(response => response.json())
         console.log(resp)
         return {temperature: resp.current.temperature_2m, unit: resp.current_units.temperature_2m}
+      }
+    },
+    CityOrError: {
+      __resolveType(smth){
+        console.log(smth)
+        return smth?.error ? 'CityError' : 'City'
       }
     }
 }
